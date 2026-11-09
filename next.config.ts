@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Framekit is a development tool; Next's own dev badge would sit on top of the canvas.
+  devIndicators: false,
   experimental: {
     agentFeedback: true,
   },

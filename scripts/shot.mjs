@@ -1,0 +1,12 @@
+import { chromium } from "@playwright/test";
+const [,, url, out, w = "1440", h = "900", waitMs = "3000"] = process.argv;
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: Number(w), height: Number(h) } });
+const logs = [];
+page.on("console", (m) => logs.push(`[${m.type()}] ${m.text()}`));
+page.on("pageerror", (e) => logs.push(`[pageerror] ${e.message}`));
+await page.goto(url, { waitUntil: "networkidle" });
+await page.waitForTimeout(Number(waitMs));
+await page.screenshot({ path: out });
+console.log(logs.filter((l) => !l.includes("Download the React DevTools") && !l.includes("[HMR]") && !l.includes("Fast Refresh")).join("\n"));
+await browser.close();

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://honestui.com/schema.json",
+  "rsc": true,
+  "tsx": true,
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "style": "base-default",
+  "tailwind": {
+    "config": "",
+    "css": "app/globals.css",
+    "cssVariables": true,
+    "prefix": "",
+    "baseColor": "neutral"
+  },
+  "iconLibrary": "honestui/icons",
+  "rtl": false,
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "registries": {}
+}

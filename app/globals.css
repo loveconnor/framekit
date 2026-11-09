@@ -1,26 +1,130 @@
 @import "tailwindcss";
+@import "honestui/theme.css" layer(base);
+@import "tw-animate-css";
 
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/*
+ * Framekit editor tokens. These style the editor chrome only; imported websites keep their own CSS.
+ * Graphite light ramp, one blue accent used for selection and the primary action.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --fk-app: #f7f7f7;
+  --fk-panel: #ffffff;
+  --fk-canvas: #ececec;
+  --fk-hover: #f3f3f3;
+  --fk-raised: #f4f4f5;
+  --fk-selected: #eff6ff;
+
+  --fk-border: #e6e6e6;
+  --fk-border-strong: #d4d4d4;
+  --fk-hairline: rgb(23 23 23 / 0.08);
+
+  --fk-text: #171717;
+  --fk-text-secondary: #525252;
+  --fk-text-muted: #737373;
+  --fk-text-faint: #a3a3a3;
+
+  --fk-accent: #2563eb;
+  --fk-accent-hover: #1d4ed8;
+  --fk-accent-soft: rgb(37 99 235 / 0.12);
+
+  --fk-error: #dc2626;
+  --fk-success: #16a34a;
+  --fk-warning: #b45309;
+
+  --fk-toolbar-height: 52px;
+  --fk-sidebar-width: 248px;
+  --fk-inspector-width: 300px;
+  --fk-statusbar-height: 28px;
+
+  --fk-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* honestui controls inside the editor are compact. */
+  --hui-density-control-height: 28px;
+  --hui-density-control-padding-inline: 8px;
+  --hui-density-item-padding-block: 6px;
+  --hui-font-size-control: 12px;
+  --hui-line-height-control: 16px;
+  --hui-radius-2: 6px;
+  --hui-radius-item: 6px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-fk-app: var(--fk-app);
+  --color-fk-panel: var(--fk-panel);
+  --color-fk-canvas: var(--fk-canvas);
+  --color-fk-hover: var(--fk-hover);
+  --color-fk-raised: var(--fk-raised);
+  --color-fk-selected: var(--fk-selected);
+  --color-fk-border: var(--fk-border);
+  --color-fk-border-strong: var(--fk-border-strong);
+  --color-fk-hairline: var(--fk-hairline);
+  --color-fk-text: var(--fk-text);
+  --color-fk-text-secondary: var(--fk-text-secondary);
+  --color-fk-text-muted: var(--fk-text-muted);
+  --color-fk-text-faint: var(--fk-text-faint);
+  --color-fk-accent: var(--fk-accent);
+  --color-fk-accent-hover: var(--fk-accent-hover);
+  --color-fk-accent-soft: var(--fk-accent-soft);
+  --color-fk-error: var(--fk-error);
+  --color-fk-success: var(--fk-success);
+  --color-fk-warning: var(--fk-warning);
+
+  --color-background: var(--fk-app);
+  --color-foreground: var(--fk-text);
+  --color-border: var(--fk-border);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --ease-fk: var(--fk-ease);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    border-color: var(--fk-border);
+  }
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--fk-app);
+    color: var(--fk-text);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 20px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: var(--fk-accent-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--fk-accent);
+    outline-offset: 1px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .fk-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--fk-border-strong) transparent;
+  }
+  .fk-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .fk-scroll::-webkit-scrollbar-thumb {
+    background: var(--fk-border-strong);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .fk-num {
+    font-variant-numeric: tabular-nums;
+  }
 }
