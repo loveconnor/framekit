@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import type { ProjectInfo } from "@/types/project";
+import { hostedConfig } from "@/lib/hosted/config";
 import { ensureDir, shortHash, toPosix, workspacesDir } from "@/lib/filesystem/paths";
 import { atomicWrite, fileExists, readTextIfExists } from "@/lib/filesystem/safe-write";
 
@@ -121,6 +122,10 @@ export class Workspace {
     const turbopackRoot = await fs.realpath(this.mirrorRoot);
     // The editor shows the preview in an iframe, so anti-framing headers (X-Frame-Options,
     // CSP frame-ancestors) are dropped from the preview only. The real project keeps them.
+    // Hosted: the preview is opened from its public URL, which Next's dev server must accept as an
+    // origin, or it refuses live-reload connections and dev assets.
+    const hosted = hostedConfig();
+    const devOrigins = hosted ? [new URL(hosted.previewPublicUrl).hostname, "*.vercel.run"] : [];
     const mergeFn = `function framekitAllowFraming(rules) {
   return (rules || []).map((rule) => ({
     ...rule,
@@ -136,6 +141,7 @@ function framekitMerge(user) {
   return {
     ...user,
     devIndicators: false,
+    ...(${JSON.stringify(devOrigins)}.length ? { allowedDevOrigins: [...(user.allowedDevOrigins || []), ...${JSON.stringify(devOrigins)}] } : {}),
     turbopack: { ...(user.turbopack || {}), root: ${JSON.stringify(turbopackRoot)} },
     ...(typeof userHeaders === "function" ? { headers: async () => framekitAllowFraming(await userHeaders.call(user)) } : {}),
   };
@@ -287,8 +293,11 @@ async function clearExceptDependencies(dir: string): Promise<void> {
   const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (entry.name === "node_modules" || entry.name === DEPS_STAMP) continue;
+    // Keep the dev server's compile cache: it validates against file contents, and without it every
+    // reopen (and every hosted wake-up) recompiles the whole site from scratch.
+    if (entry.name === ".next" && entry.isDirectory()) continue;
     const full = path.join(dir, entry.name);
-    // Build output and caches can be large and never hold dependencies: drop them whole.
+    // Other build output and caches can be large and never hold dependencies: drop them whole.
     if (entry.isDirectory() && !EXCLUDED_DIRS.has(entry.name)) await clearExceptDependencies(full);
     else await fs.rm(full, { recursive: true, force: true });
   }

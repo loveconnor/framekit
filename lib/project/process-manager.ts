@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { EventEmitter } from "node:events";
 import { resolveNextPackage } from "@/lib/preview/workspace";
+import { hostedConfig } from "@/lib/hosted/config";
 
 export type DevServerStatus = "starting" | "ready" | "stopped" | "failed";
 
@@ -40,7 +41,9 @@ export class DevServer extends EventEmitter {
 
   async start(): Promise<void> {
     await this.killStale();
-    this.port = await findFreePort();
+    // Hosted: a fixed port the sandbox exposes publicly, listening on all interfaces.
+    const hosted = hostedConfig();
+    this.port = hosted?.previewPort ?? (await findFreePort());
     this.setStatus("starting");
     this.logLines = [];
     this.lastError = null;
@@ -61,7 +64,7 @@ export class DevServer extends EventEmitter {
     env.BROWSER = "none";
     env.CI = "1";
 
-    const child: ChildProcess = spawn(process.execPath, [nextBin, "dev", "-p", String(this.port), "-H", "127.0.0.1"], {
+    const child: ChildProcess = spawn(process.execPath, [nextBin, "dev", "-p", String(this.port), "-H", hosted ? "0.0.0.0" : "127.0.0.1"], {
       cwd: this.workspaceDir,
       env: env as NodeJS.ProcessEnv,
       stdio: ["ignore", "pipe", "pipe"],

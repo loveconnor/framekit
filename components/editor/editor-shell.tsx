@@ -20,7 +20,7 @@ type ServerEvent =
   | { type: "phase"; phase: SessionSnapshot["phase"]; message: string | null }
   | { type: "dev"; event: DevServerEvent }
   | { type: "revision"; revision: number }
-  | { type: "saved"; files: string[] }
+  | { type: "saved"; files: string[]; isDirty?: boolean; dirtyFiles?: string[] }
   | { type: "routes"; routes: RouteInfo[] }
   | { type: "closed" }
   | { type: "ping" };
@@ -82,6 +82,7 @@ export function EditorShell() {
             if (event.event.type === "status" && event.event.status === "failed") state.patch({ compileError: event.event.message ?? "The project preview stopped running." });
             break;
           case "saved":
+            if (event.isDirty !== undefined) state.patch({ isDirty: event.isDirty, dirtyFiles: event.dirtyFiles ?? [], lastSavedAt: Date.now() });
             break;
           case "routes":
             state.patch({ routes: event.routes });

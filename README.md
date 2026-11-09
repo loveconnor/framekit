@@ -104,3 +104,17 @@ The fixture symlinks its `node_modules` to this repository's, so no extra instal
 
 No accounts, cloud storage, publishing, CMS, AI assistants, animation editors or a custom
 renderer. Framekit edits existing pages; it does not create routes.
+
+## Hosted mode
+
+Framekit can also run in a cloud sandbox next to one site's code and open from that site's admin dashboard, so people edit the site without installing anything. The Swipz dashboard's **Edit Site** tab does this with a Vercel Sandbox. Its backend runs `scripts/hosted/up.sh` in the sandbox, which clones the site, installs dependencies and builds Framekit, and only repeats steps whose inputs changed. The backend then starts Framekit with `FRAMEKIT_HOSTED=1`.
+
+Hosted mode changes how Framekit behaves:
+
+- **Access:** a short-lived link signed with `FRAMEKIT_ACCESS_SECRET` signs a person in and becomes a 12-hour session cookie. The cookie is partitioned, so it works inside the dashboard's iframe. API routes check the session and refuse mutations from other origins. Only origins in `FRAMEKIT_EMBED_ORIGINS` may embed the editor, and that list is fixed when Framekit is built.
+- **One project:** Framekit opens `FRAMEKIT_PROJECT_ROOT` at startup. The project screen, folder browsing and switching projects are turned off.
+- **Preview:** runs on `FRAMEKIT_PREVIEW_PORT` and is shown at `FRAMEKIT_PREVIEW_PUBLIC_URL`. That origin is allowed for Next's live reload.
+- **Drafts:** edits save into the site's working tree about 1.5 seconds after each change. Only files survive a sandbox stop. **Publish** commits as the signed-in person.
+- **Idle stop:** `GET /api/hosted/activity` and `POST /api/hosted/prepare-stop` use the `x-framekit-secret` header and let the launcher stop the sandbox when nobody has the editor open. `GET /api/hosted/health` reports whether Framekit is ready.
+
+Nothing changes when `FRAMEKIT_HOSTED` isn't set.

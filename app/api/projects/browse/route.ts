@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
-import { assertLocalRequest, errorResponse, json } from "@/lib/session/http";
+import { assertLocalRequest, assertNotHosted, errorResponse, json } from "@/lib/session/http";
 import { SessionError } from "@/lib/session/session";
 
 const Body = z.object({ startIn: z.string().max(2000).optional() });
@@ -15,6 +15,7 @@ const Body = z.object({ startIn: z.string().max(2000).optional() });
 export async function POST(request: Request) {
   try {
     assertLocalRequest(request);
+    assertNotHosted();
     const { startIn } = Body.parse(await request.json().catch(() => ({})));
     const picked = await pickFolder(await startDirectory(startIn));
     return json({ path: picked });

@@ -1,5 +1,6 @@
 import { currentSession } from "@/lib/session/registry";
 import { assertLocalRequest, errorResponse } from "@/lib/session/http";
+import { editorOpened } from "@/lib/hosted/config";
 
 /** Server-sent events for import phases, dev-server output and save notifications. */
 export async function GET(request: Request) {
@@ -24,10 +25,16 @@ export async function GET(request: Request) {
         controller.close();
         return;
       }
-      const onEvent = (event: unknown) => send(event);
+      // An open stream is an open editor: hosted mode keeps the sandbox running while any exist.
+      const release = editorOpened();
+      const onEvent = (event: unknown) => {
+        send(event);
+        if ((event as { type?: string }).type === "closed") stop();
+      };
       session.events.on("event", onEvent);
       const heartbeat = setInterval(() => send({ type: "ping" }), 15_000);
       const stop = () => {
+        release();
         clearInterval(heartbeat);
         session.events.off("event", onEvent);
         try {
@@ -37,9 +44,6 @@ export async function GET(request: Request) {
         }
       };
       request.signal.addEventListener("abort", stop);
-      session.events.once("event", (e: { type: string }) => {
-        if (e.type === "closed") stop();
-      });
     },
   });
   return new Response(stream, {

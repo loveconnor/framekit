@@ -1,7 +1,7 @@
 import { z } from "zod";
 import fs from "node:fs/promises";
 import { readConfig, writeConfig, forgetProject, updateRecentProject } from "@/lib/filesystem/config-store";
-import { assertLocalRequest, errorResponse, json } from "@/lib/session/http";
+import { assertLocalRequest, assertNotHosted, errorResponse, json } from "@/lib/session/http";
 
 export async function GET(request: Request) {
   try {
@@ -39,6 +39,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     assertLocalRequest(request);
+    assertNotHosted();
     const { path } = z.object({ path: z.string() }).parse(await request.json());
     await forgetProject(path);
     return json({ ok: true });

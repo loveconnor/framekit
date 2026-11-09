@@ -84,6 +84,40 @@ export function ProjectPicker() {
     }
   };
 
+  // `?project=swipz-landing` (from a dashboard's Edit Site tab): go straight to that project. Only
+  // projects already in Recent are opened, since opening one runs its code and any page can link here.
+  React.useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("project");
+    if (!wanted) return;
+    let cancelled = false;
+    void Promise.all([api.current(), api.recent()])
+      .then(async ([{ snapshot }, { recent: known }]) => {
+        if (cancelled) return;
+        if (snapshot && snapshot.phase !== "error" && (snapshot.project.name === wanted || snapshot.project.root === wanted)) {
+          router.replace("/editor");
+          return;
+        }
+        const match = known.find((r) => r.name === wanted || r.path === wanted);
+        if (!match) {
+          setError({ code: "NOT_FOUND", message: `“${wanted}” isn't in your recent projects. Open it here once, and links to it will work from then on.` });
+          return;
+        }
+        setPath(match.path);
+        setOpening(match.path);
+        try {
+          await api.openProject(match.path);
+          if (!cancelled) router.push("/editor");
+        } catch (e) {
+          setOpening(null);
+          setError(e instanceof ApiError && e.info ? e.info : { code: "NOT_FOUND", message: "The project could not be opened." });
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   const forget = async (p: string) => {
     await api.forgetRecent(p).catch(() => undefined);
     setRecent((r) => r.filter((x) => x.path !== p));

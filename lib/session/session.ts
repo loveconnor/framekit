@@ -24,6 +24,7 @@ import { backupsDir, contentHash, ensureDir, shortHash, toPosix, resolveInside }
 import { addPendingPublish } from "@/lib/filesystem/config-store";
 import { ProjectError } from "@/types/project";
 import { parseJsonc } from "@/lib/filesystem/jsonc";
+import { hostedConfig } from "@/lib/hosted/config";
 import { collectTextLiterals, findTextSources, setTextLiteral, TextSourceError, type TextLiteral, type TextSourceMatch } from "@/lib/source/text-sources";
 
 export type SessionPhase = "checking" | "preparing" | "starting" | "loading" | "ready" | "error";
@@ -58,6 +59,8 @@ export type CommandResult = {
 };
 
 export type SessionSnapshot = {
+  /** Hosted Framekit (one site, opened from its dashboard): hides project switching in the UI. */
+  hosted: boolean;
   phase: SessionPhase;
   phaseMessage: string | null;
   error: { message: string; detail?: string; suggestion?: string } | null;
@@ -463,7 +466,9 @@ export class ProjectSession {
         nextVersion: this.project.nextVersion,
       },
       routes: this.routes,
-      previewUrl: this.phase === "ready" ? this.dev.url : null,
+      hosted: hostedConfig() !== null,
+      // Hosted: the browser reaches the preview through its public sandbox URL, not loopback.
+      previewUrl: this.phase === "ready" ? (hostedConfig()?.previewPublicUrl ?? this.dev.url) : null,
       revision: this.revision,
       elements: [...this.elements.values()],
       css: this.css,
@@ -674,6 +679,7 @@ export class ProjectSession {
     await this.writeChanges([...touched.keys()], stylesChanged);
     this.revision++;
     this.events.emit("event", { type: "revision", revision: this.revision });
+    this.scheduleAutosave();
 
     return {
       revision: this.revision,
@@ -739,6 +745,7 @@ export class ProjectSession {
     await this.writeChanges(affected.filter((rel) => this.files.has(rel)), stylesChanged);
     this.revision++;
     this.events.emit("event", { type: "revision", revision: this.revision });
+    this.scheduleAutosave();
     return {
       revision: this.revision,
       affectedFiles: affected,
@@ -910,6 +917,33 @@ export class ProjectSession {
   /* Save                                                                */
   /* ------------------------------------------------------------------ */
 
+  private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Hosted mode saves drafts into the sandbox's copy of the site shortly after each change: the
+   * sandbox may stop when idle, and only files survive that. Publish then commits them.
+   */
+  private scheduleAutosave(): void {
+    if (!hostedConfig()) return;
+    if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
+    this.autosaveTimer = setTimeout(() => {
+      this.autosaveTimer = null;
+      if (this.closed || !this.isDirty) return;
+      this.save().catch((error) => console.error("[framekit] autosave failed:", error));
+    }, 1500);
+  }
+
+  /** Save now if anything is unsaved (the launcher calls this before stopping an idle sandbox). */
+  async flush(): Promise<boolean> {
+    if (this.autosaveTimer) {
+      clearTimeout(this.autosaveTimer);
+      this.autosaveTimer = null;
+    }
+    if (this.phase !== "ready" || !this.isDirty) return false;
+    await this.save();
+    return true;
+  }
+
   async save(): Promise<{ files: string[]; backupDir: string | null }> {
     if (this.phase !== "ready") throw new SessionError("The project preview isn't ready yet.", "NOT_READY", 409);
     const changedFiles = [...this.files.entries()].filter(([, f]) => f.draft !== f.saved);
@@ -993,7 +1027,8 @@ export class ProjectSession {
     this.pendingAssets.clear();
     // Remember what Framekit wrote so Publish commits exactly these files and nothing else.
     await addPendingPublish(this.project.root, written.map(toPosix)).catch(() => {});
-    this.events.emit("event", { type: "saved", files: written });
+    // Saves can happen without the editor asking (hosted autosave): tell it the new state.
+    this.events.emit("event", { type: "saved", files: written, isDirty: this.isDirty, dirtyFiles: this.dirtyFiles });
     return { files: written, backupDir: manifest.some((m) => m.existed) ? backupRoot : null };
   }
 }

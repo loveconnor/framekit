@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { currentSession } from "@/lib/session/registry";
-import { assertLocalRequest, errorResponse, json } from "@/lib/session/http";
+import { assertLocalRequest, errorResponse, json, requestUser } from "@/lib/session/http";
 import { SessionError } from "@/lib/session/session";
 import { defaultMessage, publish, publishStatus } from "@/lib/project/publish";
 
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     assertLocalRequest(request);
     const session = requireSession();
     const { message } = Body.parse(await request.json().catch(() => ({})));
-    return json(await publish(session.project.root, message));
+    return json(await publish(session.project.root, message, requestUser(request)));
   } catch (error) {
     return errorResponse(error);
   }

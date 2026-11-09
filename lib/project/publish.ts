@@ -123,7 +123,11 @@ export async function publishStatus(projectRoot: string): Promise<PublishStatus>
   return status;
 }
 
-export async function publish(projectRoot: string, message: string): Promise<PublishResult> {
+/**
+ * @param author Email of the person publishing (hosted mode, where the machine has no git identity of
+ *   its own); locally the repository's git identity is used.
+ */
+export async function publish(projectRoot: string, message: string, author: string | null = null): Promise<PublishResult> {
   const info = await inspect(projectRoot, { fetch: true });
   if (!info.available) throw new SessionError(info.reason, "PUBLISH_UNAVAILABLE", 409);
   const { git, files, branch, upstream, remote, remoteBranch } = info;
@@ -142,7 +146,8 @@ export async function publish(projectRoot: string, message: string): Promise<Pub
     try {
       await git(["add", "--", ...files]);
       // `--only` semantics: commit exactly these paths even if other changes are staged.
-      await git(["commit", "--only", "-m", subject, "--", ...files], { timeout: 120_000 });
+      const identity = author ? ["-c", `user.name=${author.split("@")[0]}`, "-c", `user.email=${author}`] : [];
+      await git([...identity, "commit", "--only", "-m", subject, "--", ...files], { timeout: 120_000 });
     } catch (error) {
       throw new SessionError(`Couldn't commit: ${(error as Error).message}`, "PUBLISH_COMMIT_FAILED", 500);
     }

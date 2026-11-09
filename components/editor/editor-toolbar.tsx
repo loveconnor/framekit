@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 export function EditorToolbar() {
   const router = useRouter();
   const project = useEditor((s) => s.project);
+  const hosted = useEditor((s) => s.hosted);
   const routes = useEditor((s) => s.routes);
   const activeRoute = useEditor((s) => s.activeRoute);
   const setRoute = useEditor((s) => s.setRoute);
@@ -96,10 +97,10 @@ export function EditorToolbar() {
             <ChevronDown className="size-3.5 text-fk-text-faint" strokeWidth={1.5} />
           </MenuTrigger>
           <MenuPopup align="start" className="min-w-44">
-            <MenuItem onClick={() => void leave("back")}>Back to projects</MenuItem>
+            {!hosted && <MenuItem onClick={() => void leave("back")}>Back to projects</MenuItem>}
             {/* Rebuilds the preview copy and restarts its dev server, e.g. after the project's config changed. */}
             {project && <MenuItem onClick={() => void leave(project.root)}>Reload project</MenuItem>}
-            <MenuItem onClick={() => void leave("close")}>Close project</MenuItem>
+            {!hosted && <MenuItem onClick={() => void leave("close")}>Close project</MenuItem>}
           </MenuPopup>
         </Menu>
 
@@ -117,8 +118,9 @@ export function EditorToolbar() {
                 <p className="truncate font-mono text-[11px] text-fk-text-muted">{project.root}</p>
               </div>
             )}
-            {recent.filter((r) => r.path !== project?.root).length > 0 && <MenuSeparator />}
-            {recent
+            {/* Hosted Framekit edits one site: no switching to other projects. */}
+            {!hosted && recent.filter((r) => r.path !== project?.root).length > 0 && <MenuSeparator />}
+            {(hosted ? [] : recent)
               .filter((r) => r.path !== project?.root)
               .map((r) => (
                 <MenuItem key={r.path} onClick={() => void leave(r.path)}>

@@ -24,6 +24,7 @@ export type EditorState = {
   phase: SessionPhase | "none";
   phaseMessage: string | null;
   error: SessionSnapshot["error"];
+  hosted: boolean;
   project: SessionSnapshot["project"] | null;
   routes: RouteInfo[];
   previewUrl: string | null;
@@ -104,6 +105,7 @@ export type EditorState = {
 };
 
 const EMPTY_SESSION = {
+  hosted: false,
   phase: "none" as const,
   phaseMessage: null,
   error: null,
@@ -172,6 +174,7 @@ export const useEditor = create<EditorState>((set, get) => ({
       phaseMessage: snapshot.phaseMessage,
       error: snapshot.error,
       project: snapshot.project,
+      hosted: snapshot.hosted,
       routes: snapshot.routes,
       previewUrl: snapshot.previewUrl,
       revision: snapshot.revision,
