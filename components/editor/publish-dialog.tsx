@@ -9,7 +9,7 @@ import { toast } from "@/components/ui/toaster";
 import { api, ApiError } from "@/lib/client/api";
 import type { PublishResult, PublishStatus } from "@/lib/project/publish";
 
-type Loaded = { status: PublishStatus; defaultMessage: string; unsavedEdits: boolean };
+type Loaded = { status: PublishStatus; defaultMessage: string; unsavedEdits: boolean; hosted: boolean };
 
 /**
  * Commit the files Framekit saved and push them; the host (e.g. Vercel) deploys from the push.
@@ -41,8 +41,10 @@ export function PublishDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
   const status = loaded?.status;
   const ready = status?.available === true;
-  const nothing = ready && status.files.length === 0 && status.ahead === 0;
-  const blocked = !ready || nothing || status.behind > 0;
+  // Hosted: Publish saves pending edits and brings in newer upstream commits itself.
+  const hosted = loaded?.hosted === true;
+  const nothing = ready && status.files.length === 0 && status.ahead === 0 && !(hosted && loaded?.unsavedEdits);
+  const blocked = !ready || nothing || (status.behind > 0 && !hosted);
   const remoteBranch = ready ? status.upstream.split("/").slice(1).join("/") : "";
 
   const run = async () => {
@@ -60,13 +62,21 @@ export function PublishDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !publishing && onOpenChange(o)}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (publishing) return;
+        // Publishing brought in newer changes to the site and reopened it: load the editor afresh.
+        if (!o && result?.synced) window.location.reload();
+        else onOpenChange(o);
+      }}
+    >
       <DialogPopup className="max-w-[480px]">
         <DialogHeader>
           <DialogTitle>{result ? "Published" : "Publish"}</DialogTitle>
           <DialogDescription>
             {result
-              ? "Your host deploys from this push. The live site updates when that build finishes, usually in a minute or two."
+              ? "Your host deploys from this push. The live site updates when that build finishes, usually in a few minutes."
               : "Commit the changes you saved in Framekit and push them. Your host deploys the site from the push."}
           </DialogDescription>
         </DialogHeader>
@@ -138,7 +148,7 @@ export function PublishDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </label>
               )}
 
-              {status.behind > 0 && (
+              {status.behind > 0 && !hosted && (
                 <Notice>
                   {status.upstream} has {status.behind} new commit{status.behind === 1 ? "" : "s"}. Pull first (<code className="font-mono">git pull</code>), reload the project, then publish.
                 </Notice>
@@ -146,7 +156,8 @@ export function PublishDialog({ open, onOpenChange }: { open: boolean; onOpenCha
               {nothing && <p className="text-fk-text-muted">Nothing to publish. Save your edits first.</p>}
 
               <ul className="flex flex-col gap-1 text-[11.5px] leading-4 text-fk-text-muted empty:hidden">
-                {loaded?.unsavedEdits && <li>Unsaved edits aren&apos;t included. Save them first to publish them.</li>}
+                {hosted && status.behind > 0 && <li>Newer changes to the site are brought in first; the editor reloads afterwards.</li>}
+                {loaded?.unsavedEdits && !hosted && <li>Unsaved edits aren&apos;t included. Save them first to publish them.</li>}
                 {status.otherChanges > 0 && (
                   <li>
                     {status.otherChanges} other uncommitted change{status.otherChanges === 1 ? "" : "s"} in this folder {status.otherChanges === 1 ? "is" : "are"} left out.

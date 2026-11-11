@@ -96,6 +96,48 @@ describe("publish", () => {
     expect(git(remote, "log", "-2", "--format=%s", "main").split("\n")[1]).toBe("local commit");
   });
 
+  it("hosted: commits as the configured author, credits the publisher and brings in newer commits", async () => {
+    const { addPendingPublish } = await import("@/lib/filesystem/config-store");
+    const { publish } = await import("@/lib/project/publish");
+    git(other, "pull");
+    await fs.writeFile(path.join(other, "site/app/other.tsx"), "export const other = 1;\n");
+    git(other, "add", "-A");
+    git(other, "commit", "-m", "teammate site change");
+    git(other, "push");
+
+    await fs.writeFile(path.join(project, "app/page.tsx"), "export default function P() { return <h1>Four</h1>; }\n");
+    await addPendingPublish(project, ["app/page.tsx"]);
+    process.env.FRAMEKIT_COMMIT_AUTHOR = "Site Owner <owner@example.com>";
+    try {
+      const result = await publish(project, "Hosted edit", { publisher: "editor@example.com", sync: true });
+      expect(result.synced).toBe(true);
+      expect(git(remote, "log", "-1", "--format=%an <%ae>|%s|%b", "main")).toBe("Site Owner <owner@example.com>|Hosted edit|Published by editor@example.com with Framekit.");
+      expect(git(remote, "rev-parse", "main")).toBe(result.sha);
+      expect(git(remote, "log", "-2", "--format=%s", "main").split("\n")[1]).toBe("teammate site change");
+      // Work Framekit didn't make survives the sync, still uncommitted.
+      expect(git(clone, "status", "--porcelain")).toContain("notes.txt");
+      expect(await fs.readFile(path.join(project, "app/other.tsx"), "utf8")).toContain("other = 1");
+    } finally {
+      delete process.env.FRAMEKIT_COMMIT_AUTHOR;
+    }
+  });
+
+  it("hosted: leaves everything in place when newer commits overlap the edits", async () => {
+    const { addPendingPublish } = await import("@/lib/filesystem/config-store");
+    const { publish } = await import("@/lib/project/publish");
+    git(other, "pull");
+    await fs.writeFile(path.join(other, "site/app/page.tsx"), "export default function P() { return <h1>Theirs</h1>; }\n");
+    git(other, "commit", "-am", "teammate edits the same line");
+    git(other, "push");
+
+    await fs.writeFile(path.join(project, "app/page.tsx"), "export default function P() { return <h1>Ours</h1>; }\n");
+    await addPendingPublish(project, ["app/page.tsx"]);
+    await expect(publish(project, "", { publisher: "editor@example.com", sync: true })).rejects.toMatchObject({ code: "PUBLISH_CONFLICT" });
+    expect(git(remote, "log", "-1", "--format=%s", "main")).toBe("teammate edits the same line");
+    expect(await fs.readFile(path.join(project, "app/page.tsx"), "utf8")).toContain("Ours");
+    expect(git(clone, "status", "--porcelain")).toContain("notes.txt");
+  });
+
   it("explains when there's no repository", async () => {
     const { publishStatus } = await import("@/lib/project/publish");
     const loose = path.join(tmp, "loose");

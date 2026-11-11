@@ -6,7 +6,8 @@
 #
 # Required env: GIT_TOKEN, SITE_REPO (owner/name), SITE_APP (app folder in the repo)
 # Optional env: SITE_BRANCH (default main), FRAMEKIT_REPO (default loveconnor/framekit),
-#               FRAMEKIT_REF (git ref; "local" = source already copied into $FK_DIR)
+#               FRAMEKIT_REF (branch, tag or commit; "local" = source already copied into $FK_DIR),
+#               FRAMEKIT_COMMIT_AUTHOR ("Name <email>" Publish commits as; default: the token's owner)
 set -euo pipefail
 
 BASE=/vercel/sandbox
@@ -53,12 +54,16 @@ if [ "$FRAMEKIT_REF" != "local" ]; then
     step "cloning $FRAMEKIT_REPO"
     git clone --quiet "https://github.com/$FRAMEKIT_REPO.git" "$FK_DIR"
   fi
-  if [ "$(cat "$STAMPS/framekit-ref" 2>/dev/null)" != "$FRAMEKIT_REF" ]; then
+  # A branch name means the branch's latest commit on the remote, not a stale local copy of it.
+  git -C "$FK_DIR" fetch --quiet origin || step "couldn't reach $FRAMEKIT_REPO; keeping the current editor"
+  FK_TARGET="$(git -C "$FK_DIR" rev-parse --verify --quiet "origin/$FRAMEKIT_REF^{commit}" || git -C "$FK_DIR" rev-parse --verify "$FRAMEKIT_REF^{commit}")"
+  if [ "$(git -C "$FK_DIR" rev-parse HEAD)" != "$FK_TARGET" ]; then
     step "checking out Framekit $FRAMEKIT_REF"
-    git -C "$FK_DIR" fetch --quiet origin
-    git -C "$FK_DIR" checkout --quiet --force "$FRAMEKIT_REF"
-    rm -rf "$FK_DIR/.next"
+    git -C "$FK_DIR" checkout --quiet --force --detach "$FK_TARGET"
   fi
+  FK_VERSION="$(git -C "$FK_DIR" rev-parse HEAD)"
+else
+  FK_VERSION=local
 fi
 FK_LOCK="$(hash_of "$FK_DIR/package-lock.json")"
 if [ ! -d "$FK_DIR/node_modules" ] || [ "$(cat "$STAMPS/framekit-deps" 2>/dev/null)" != "$FK_LOCK" ]; then
@@ -69,11 +74,11 @@ if [ ! -d "$FK_DIR/node_modules" ] || [ "$(cat "$STAMPS/framekit-deps" 2>/dev/nu
 fi
 # Next bakes next.config headers() into the build, so the sites allowed to embed the editor
 # (FRAMEKIT_EMBED_ORIGINS) are part of what's built. Other hosted settings are read at runtime.
-BUILD_KEY="$FRAMEKIT_REF|${FRAMEKIT_EMBED_ORIGINS:-}"
+BUILD_KEY="$FK_VERSION|${FRAMEKIT_EMBED_ORIGINS:-}"
 if [ ! -f "$FK_DIR/.next/BUILD_ID" ] || [ "$(cat "$STAMPS/framekit-build" 2>/dev/null)" != "$BUILD_KEY" ]; then
   step "building Framekit"
+  rm -rf "$FK_DIR/.next"
   (cd "$FK_DIR" && NEXT_TELEMETRY_DISABLED=1 npx next build >/dev/null)
   echo "$BUILD_KEY" > "$STAMPS/framekit-build"
 fi
-echo "$FRAMEKIT_REF" > "$STAMPS/framekit-ref"
 step "ready: site at $APP_DIR"

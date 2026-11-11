@@ -114,7 +114,7 @@ Hosted mode changes how Framekit behaves:
 - **Access:** a short-lived link signed with `FRAMEKIT_ACCESS_SECRET` signs a person in and becomes a 12-hour session cookie. The cookie is partitioned, so it works inside the dashboard's iframe. API routes check the session and refuse mutations from other origins. Only origins in `FRAMEKIT_EMBED_ORIGINS` may embed the editor, and that list is fixed when Framekit is built.
 - **One project:** Framekit opens `FRAMEKIT_PROJECT_ROOT` at startup. The project screen, folder browsing and switching projects are turned off.
 - **Preview:** runs on `FRAMEKIT_PREVIEW_PORT` and is shown at `FRAMEKIT_PREVIEW_PUBLIC_URL`. That origin is allowed for Next's live reload.
-- **Drafts:** edits save into the site's working tree about 1.5 seconds after each change. Only files survive a sandbox stop. **Publish** commits as the signed-in person.
+- **Drafts:** edits save into the site's working tree about 1.5 seconds after each change. Only files survive a sandbox stop. **Publish** saves pending edits, commits, puts the commit on top of any newer upstream commits and pushes. The commit is authored by `FRAMEKIT_COMMIT_AUTHOR` (`Name <email>`) or, on GitHub, by the owner of `GIT_TOKEN`, because hosts such as Vercel only deploy commits from people with access to the project; the message names the signed-in person.
 - **Idle stop:** `GET /api/hosted/activity` and `POST /api/hosted/prepare-stop` use the `x-framekit-secret` header and let the launcher stop the sandbox when nobody has the editor open. `GET /api/hosted/health` reports whether Framekit is ready.
 
 Nothing changes when `FRAMEKIT_HOSTED` isn't set.
